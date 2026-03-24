@@ -1,0 +1,127 @@
+# ═══════════════════════════════════════════════════════════
+# Kheteebaadi - Full Stack Docker Compose
+# Usage: docker compose up -d
+# ═══════════════════════════════════════════════════════════
+
+version: "3.9"
+
+x-common-env: &common-env
+  DATABASE_URL: postgresql+asyncpg://kheteebaadi:kheteebaadi_secret@postgres:5432/kheteebaadi
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET_KEY: change-this-to-a-secure-random-string-in-production
+  JWT_ALGORITHM: HS256
+  DEBUG: "false"
+  CORS_ORIGINS: '["http://localhost:3000","http://localhost:8080"]'
+
+services:
+  # ── PostgreSQL 16 ──
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: kheteebaadi-postgres
+    environment:
+      POSTGRES_DB: kheteebaadi
+      POSTGRES_USER: kheteebaadi
+      POSTGRES_PASSWORD: kheteebaadi_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kheteebaadi -d kheteebaadi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Redis 7 ──
+  redis:
+    image: redis:7-alpine
+    container_name: kheteebaadi-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── FastAPI Backend ──
+  backend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.backend
+    container_name: kheteebaadi-backend
+    environment:
+      <<: *common-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Celery Worker ──
+  celery-worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.celery
+    container_name: kheteebaadi-celery-worker
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Celery Beat Scheduler ──
+  celery-beat:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.celery
+    container_name: kheteebaadi-celery-beat
+    environment:
+      <<: *common-env
+    command: >
+      celery -A app.workers.celery_app beat
+      --loglevel=info
+      --schedule=/tmp/celerybeat-schedule
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── DB Migrations ──
+  migrations:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.backend
+    container_name: kheteebaadi-migrations
+    environment:
+      <<: *common-env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

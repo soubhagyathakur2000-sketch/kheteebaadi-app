@@ -1,0 +1,117 @@
+OVOL DASHBOARD - COMPLETE FILE MANIFEST
+========================================
+
+PROJECT STRUCTURE:
+ovol-dashboard/
+├── Configuration Files (6)
+│   ├── package.json                    - Dependencies and npm scripts
+│   ├── next.config.js                  - Next.js configuration
+│   ├── tsconfig.json                   - TypeScript configuration
+│   ├── tailwind.config.js              - Tailwind CSS config with brand colors
+│   ├── postcss.config.js               - PostCSS config
+│   └── .gitignore                      - Git ignore rules
+│
+├── Documentation (4)
+│   ├── README.md                       - Project overview and setup
+│   ├── IMPLEMENTATION_GUIDE.md         - Technical implementation details
+│   ├── DEPLOYMENT.md                   - Deployment instructions
+│   └── FILE_MANIFEST.txt               - This file
+│
+├── Environment (1)
+│   └── .env.example                    - Environment variables template
+│
+├── Source Code (26)
+│   ├── src/app/ (8 pages + 1 layout + 1 root layout)
+│   │   ├── layout.tsx                  - Root layout with providers
+│   │   ├── page.tsx                    - Redirect to dashboard
+│   │   ├── globals.css                 - Global styles
+│   │   └── dashboard/
+│   │       ├── layout.tsx              - Dashboard wrapper layout
+│   │       ├── page.tsx                - Main dashboard (7 components)
+│   │       ├── map/page.tsx            - Map view (Mapbox GL)
+│   │       ├── farmers/page.tsx        - Farmer management
+│   │       ├── orders/page.tsx         - Order Kanban board
+│   │       ├── inventory/page.tsx      - Inventory management
+│   │       ├── payments/page.tsx       - Payment reconciliation
+│   │       └── analytics/page.tsx      - Analytics charts (Recharts)
+│   │
+│   ├── src/components/ (9 components)
+│   │   ├── Header.tsx                  - Top header
+│   │   ├── Sidebar.tsx                 - Navigation sidebar
+│   │   ├── StatsCard.tsx               - KPI card component
+│   │   ├── Skeleton.tsx                - Loading skeleton
+│   │   ├── Notifications.tsx           - Toast notifications
+│   │   ├── FarmerTable.tsx             - Farmer data table
+│   │   ├── MapView.tsx                 - Mapbox GL wrapper
+│   │   ├── OrderKanban.tsx             - Kanban board
+│   │   └── providers/QueryProvider.tsx - TanStack Query provider
+│   │
+│   ├── src/lib/ (3 modules)
+│   │   ├── types.ts                    - TypeScript interfaces
+│   │   ├── api.ts                      - API client
+│   │   └── store.ts                    - Zustand stores
+│   │
+│   └── src/hooks/ (1 custom hook)
+│       └── useWebSocket.ts             - WebSocket with auto-reconnect
+
+TOTAL FILES: 35
+TOTAL SIZE: ~176 KB
+
+KEY FEATURES:
+✓ 7 Dashboard pages with full functionality
+✓ Real-time WebSocket integration
+✓ Mapbox GL JS with clustering
+✓ 4+ Recharts visualizations
+✓ Responsive design (mobile-first)
+✓ Type-safe TypeScript
+✓ TanStack Query for data fetching
+✓ Zustand state management
+✓ Tailwind CSS styling
+✓ Toast notifications
+✓ Error handling
+✓ Production-ready code
+
+QUICK START:
+1. npm install
+2. cp .env.example .env.local
+3. Configure environment variables
+4. npm run dev
+5. Open http://localhost:3000
+
+TECHNOLOGY STACK:
+- Next.js 14 (App Router)
+- React 18
+- TypeScript 5.3
+- TanStack Query 5
+- Zustand 4
+- Tailwind CSS 3
+- Mapbox GL 3
+- Recharts 2
+- Heroicons 2
+
+API INTEGRATION:
+- Centralized API client with error handling
+- Support for farmers, orders, payments, villages, listings
+- Automatic authentication token injection
+- Response validation and typing
+
+STATE MANAGEMENT:
+- Sidebar state
+- Global filters (crop, village, stock level)
+- Map viewport
+- Notifications
+- Authentication
+
+RESPONSIVE FEATURES:
+- Desktop: 3-4 column layouts
+- Tablet: 2-3 column layouts
+- Mobile: 1 column with collapsible sidebar
+
+DEPLOYMENT READY FOR:
+- Vercel (recommended)
+- Docker
+- AWS EC2
+- Azure App Service
+- Self-hosted
+
+SEE README.md FOR DETAILED DOCUMENTATION

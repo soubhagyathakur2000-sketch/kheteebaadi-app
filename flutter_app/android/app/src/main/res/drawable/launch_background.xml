@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Kheteebaadi brand green background -->
+    <item android:drawable="@android:color/white"/>
+    <!-- Uncomment to add logo when you have ic_launcher asset -->
+    <!-- <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@mipmap/ic_launcher"/>
+    </item> -->
+</layer-list>

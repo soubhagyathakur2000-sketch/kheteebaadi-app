@@ -1,0 +1,206 @@
+KHETEEBAADI APP - FLUTTER UNIT TEST SUITE MANIFEST
+====================================================
+
+TEST BASE PATH: /sessions/nifty-beautiful-pascal/mnt/kheteebadi aap/kheteebaadi-app/flutter_app/test/
+
+FILE LISTING & CONTENTS:
+
+1. helpers/test_helpers.dart (203 lines)
+   - MockApiClient: Simulates API responses and failures
+   - MockNetworkInfo: Controls network connectivity states
+   - TestCropListingFactory: Creates test crop listing instances
+   - TestProductFactory: Creates test product instances
+   - TestPaymentFactory: Creates test payment instances
+
+2. unit/models/crop_listing_model_test.dart (397 lines, 21 tests)
+   GROUP: CropListingModel
+   - fromJson: Complete data, null fields, missing keys
+   - toJson: Round-trip serialization
+   - CropListingStatus.fromValue: All 4 enum values (draft, pendingSync, synced, sold)
+   - fromDriftEntity: Valid JSON, empty paths, malformed JSON
+   - toCompanion: Drift database companion creation
+   - copyWith: Immutable field updates
+
+3. unit/models/payment_model_test.dart (453 lines, 27 tests)
+   GROUP: PaymentModel
+   - fromJson: Complete fields, null fields, currency/pollCount defaults
+   GROUP: PaymentStatus.fromJson
+   - All 7 enum values: initiated, authorized, captured, failed, timeout, refundInitiated, refundCompleted
+   - Unknown status defaults to failed
+   GROUP: Payment.isSuccessful
+   - True for captured, authorized
+   GROUP: Payment.isFailed
+   - True for failed, timeout
+   GROUP: Payment.isPending
+   - True for initiated, authorized
+   GROUP: toJson and round-trip
+   - Full serialization cycle with all fields
+
+4. unit/models/product_model_test.dart (320 lines, 17 tests)
+   GROUP: ProductModel
+   - fromJson: Complete data, null defaults
+   - nameLocal fallback to name when null
+   - unit defaults to 'unit'
+   - imageUrl defaults to empty string
+   - description defaults to empty string
+   - stockQuantity defaults to 0
+   - inStock defaults to true
+   GROUP: toJson and round-trip
+   GROUP: fromEntity/toEntity conversions
+   GROUP: Numeric value handling
+
+5. unit/database/app_database_test.dart (831 lines, 35 tests)
+   GROUP: AppDatabase
+   SUBGROUP: User operations
+   - Insert and retrieve user
+   - Retrieve by phone
+   - Get all users
+   - Delete user
+   SUBGROUP: Crop Listing operations
+   - Insert and retrieve listings
+   - Verify descending order by createdAt
+   - Update listing status
+   - Get unsynced listings
+   SUBGROUP: Cart operations
+   - Add item to cart
+   - Update item quantity
+   - Remove item from cart
+   - Clear all cart items
+   - Stream emissions on changes
+   SUBGROUP: Payment operations
+   - Insert payment pending record
+   - Get by order ID
+   - Get by Razorpay order ID
+   - Update status
+   - Increment poll count
+   SUBGROUP: PendingSync operations
+   - Insert sync record
+   - Get items in ascending order by createdAt
+   - Update status
+   - Increment retry count
+   SUBGROUP: Product operations
+   - Insert and retrieve product
+   - Search by name
+   - Search by nameLocal
+   SUBGROUP: deleteAllData
+   - Clear all 9 tables
+
+6. unit/sync/sync_engine_test.dart (287 lines, 13 tests)
+   GROUP: SyncEngine
+   SUBGROUP: sync method
+   - Does nothing when already syncing
+   - Does nothing when offline
+   - Emits isSyncing true when starting
+   - Emits isSyncing false when completing
+   - Handles API 500 error with retry increment
+   - Emits status at each stage
+   SUBGROUP: addPendingSync method
+   - Creates record with UUID
+   - Updates pending count
+   - Uses idempotency key for duplication
+   SUBGROUP: statusStream
+   - Broadcast stream support
+   - Emits SyncStatus objects
+   - Correct properties validation
+   SUBGROUP: SyncStatus
+   - Defaults and copyWith support
+   SUBGROUP: SyncFailureItem
+   - Stores failure details
+
+7. unit/payment/payment_state_machine_test.dart (358 lines, 30 tests)
+   GROUP: PaymentStateMachine
+   SUBGROUP: Valid transitions
+   - initiated → authorized, failed, timeout
+   - authorized → captured, failed
+   - captured → refundInitiated
+   - refundInitiated → refundCompleted
+   - timeout → initiated (retry)
+   SUBGROUP: Invalid transitions
+   - captured → initiated (backward)
+   - failed → any state (terminal)
+   - refundCompleted → any state (terminal)
+   SUBGROUP: Terminal states
+   - failed cannot transition anywhere
+   - refundCompleted cannot transition anywhere
+   SUBGROUP: Happy path scenarios
+   - initiated → authorized → captured
+   - captured → refundInitiated → refundCompleted
+   - Payment failure path
+   - Timeout and retry flow
+   SUBGROUP: Edge cases
+   - Same state identity
+   - All enum values validation
+
+8. unit/services/image_compression_service_test.dart (368 lines, 22 tests)
+   GROUP: ImageCompressionService
+   SUBGROUP: compressImage
+   - Correct quality parameter (70)
+   - Correct width parameter (800)
+   - JPEG format
+   - Exception on failure
+   - Path return
+   SUBGROUP: Re-compression
+   - Triggers when file > 300KB
+   - Uses lower quality (50)
+   - Deletes original file
+   - Returns re-compressed path
+   SUBGROUP: compressImages (multiple files)
+   - Concurrent processing
+   - List of paths returned
+   - Empty list handling
+   SUBGROUP: deleteCompressedImage
+   - Deletes existing file
+   - No error if file doesn't exist
+   SUBGROUP: getFileSizeKb
+   - Returns KB correctly
+   - Byte to KB conversion
+   SUBGROUP: App constants integration
+   - Uses AppConstants.imageQuality
+   - Uses AppConstants.maxImageWidth
+   - Re-compresses at maxImageSizeKb * 2
+
+SUMMARY STATISTICS:
+==================
+Total Files: 8
+Total Lines: 3,217
+Total Tests: 165+
+Total Groups: 40+
+
+Models: 3 files, 65 tests
+Database: 1 file, 35 tests
+Sync: 1 file, 13 tests
+Payment: 1 file, 30 tests
+Services: 1 file, 22 tests
+Helpers: 1 file (shared utilities)
+
+TESTING APPROACH:
+=================
+- No external mocks (manual implementation)
+- In-memory Drift database for testing
+- AAA (Arrange-Act-Assert) pattern
+- Factory methods for test data
+- Comprehensive coverage of:
+  * Happy paths
+  * Error scenarios
+  * Edge cases
+  * State transitions
+  * Round-trip serialization
+  * Enum handling
+  * Stream emissions
+
+RUNNING TESTS:
+==============
+All tests:
+  flutter test
+
+Specific file:
+  flutter test test/unit/models/crop_listing_model_test.dart
+
+With coverage:
+  flutter test --coverage
+
+Specific group/test:
+  flutter test test/unit/models/ -k "CropListingModel"
+
+Watch mode:
+  flutter test --watch

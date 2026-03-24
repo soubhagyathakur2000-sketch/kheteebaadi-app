@@ -1,0 +1,26 @@
+# ═══════════════════════════════════════════════════
+# Kheteebaadi Celery Worker Dockerfile
+# ═══════════════════════════════════════════════════
+
+FROM python:3.12-slim
+
+RUN groupadd -r kheteebaadi && useradd -r -g kheteebaadi -d /app -s /sbin/nologin kheteebaadi
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend/ .
+RUN chown -R kheteebaadi:kheteebaadi /app
+
+USER kheteebaadi
+
+# Worker command
+CMD ["celery", "-A", "app.workers.celery_app", "worker", \
+     "--loglevel=info", \
+     "--concurrency=4", \
+     "--max-tasks-per-child=1000"]

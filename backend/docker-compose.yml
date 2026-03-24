@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kheteebaadi_postgres
+    environment:
+      POSTGRES_USER: kheteebaadi
+      POSTGRES_PASSWORD: kheteebaadi_password
+      POSTGRES_DB: kheteebaadi
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kheteebaadi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: kheteebaadi_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: kheteebaadi_api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kheteebaadi:kheteebaadi_password@postgres:5432/kheteebaadi
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: dev-secret-key-change-in-production
+      DEBUG: "True"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery_worker:
+    build: .
+    container_name: kheteebaadi_celery_worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kheteebaadi:kheteebaadi_password@postgres:5432/kheteebaadi
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: dev-secret-key-change-in-production
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - .:/app
+    command: celery -A app.workers.celery_app worker --loglevel=info --queues=default,notifications,maintenance,reports
+
+  celery_beat:
+    build: .
+    container_name: kheteebaadi_celery_beat
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kheteebaadi:kheteebaadi_password@postgres:5432/kheteebaadi
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: dev-secret-key-change-in-production
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - .:/app
+    command: celery -A app.workers.celery_app beat --loglevel=info
+
+volumes:
+  postgres_data:
+  redis_data:

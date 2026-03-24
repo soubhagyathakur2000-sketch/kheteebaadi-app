@@ -1,0 +1,57 @@
+# ── Environment files (NEVER commit these) ──
+.env
+.env.local
+.env.production
+.env.staging
+backend/.env
+ovol-dashboard/.env
+flutter_app/.env
+
+# ── IDE ──
+.idea/
+.vscode/
+*.iml
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Python ──
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+htmlcov/
+.coverage
+venv/
+.venv/
+
+# ── Node ──
+node_modules/
+.next/
+out/
+dist/
+
+# ── Flutter ──
+flutter_app/.dart_tool/
+flutter_app/.packages
+flutter_app/build/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+
+# ── Docker ──
+*.log
+
+# ── Terraform ──
+infrastructure/terraform/.terraform/
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.*
+infrastructure/terraform/*.tfvars
+infrastructure/terraform/.terraform.lock.hcl
+infrastructure/terraform/tfplan
+
+# ── Android signing ──
+flutter_app/android/app/upload-keystore.jks
+flutter_app/android/key.properties
+*.keystore
+*.jks

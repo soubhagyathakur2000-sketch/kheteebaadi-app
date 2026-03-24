@@ -1,0 +1,151 @@
+name: Stage 1 - Lint & Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - '**'
+
+jobs:
+  flutter-lint-test:
+    name: Flutter Lint & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+
+      - name: Get dependencies
+        working-directory: flutter_app
+        run: flutter pub get
+
+      - name: Run dart analyze
+        working-directory: flutter_app
+        run: dart analyze
+
+      - name: Run unit tests with coverage
+        working-directory: flutter_app
+        run: flutter test --coverage
+
+      - name: Upload Flutter coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./flutter_app/coverage/lcov.info
+          flags: flutter
+          fail_ci_if_error: false
+
+  python-lint-test:
+    name: Python Lint & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          pip install -e .
+          pip install ruff mypy pytest pytest-cov
+
+      - name: Run ruff check
+        working-directory: backend
+        run: ruff check src/ tests/
+
+      - name: Run mypy (soft mode)
+        working-directory: backend
+        run: mypy src/ --no-error-summary || true
+
+      - name: Run unit tests with coverage
+        working-directory: backend
+        run: pytest tests/unit/ --cov=src --cov-report=xml --cov-report=term
+
+      - name: Upload Python coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage.xml
+          flags: python
+          fail_ci_if_error: false
+
+  dashboard-lint-test:
+    name: Dashboard Lint, Type Check & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'ovol-dashboard/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ovol-dashboard
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: ovol-dashboard
+        run: npx eslint src/ --max-warnings 0
+
+      - name: Run TypeScript compiler
+        working-directory: ovol-dashboard
+        run: npx tsc --noEmit
+
+      - name: Run unit tests with coverage
+        working-directory: ovol-dashboard
+        run: npx vitest run --coverage
+
+      - name: Upload Dashboard coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./ovol-dashboard/coverage/coverage-final.json
+          flags: dashboard
+          fail_ci_if_error: false
+
+  apk-size-check:
+    name: APK Size Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+
+      - name: Get dependencies
+        working-directory: flutter_app
+        run: flutter pub get
+
+      - name: Build APK with size analysis
+        working-directory: flutter_app
+        run: flutter build apk --analyze-size
+
+      - name: Check APK size
+        working-directory: flutter_app
+        run: |
+          SIZE=$(stat -f%z build/app/outputs/flutter-app.apk 2>/dev/null || stat -c%s build/app/outputs/flutter-app.apk)
+          SIZE_MB=$((SIZE / 1048576))
+          echo "APK Size: ${SIZE_MB}MB"
+          if [ $SIZE_MB -gt 15 ]; then
+            echo "APK size exceeds 15MB limit (${SIZE_MB}MB)"
+            exit 1
+          fi

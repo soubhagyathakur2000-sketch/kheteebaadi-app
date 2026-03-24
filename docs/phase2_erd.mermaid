@@ -1,0 +1,428 @@
+erDiagram
+    %% ═══════════════════════════════════════════════════
+    %% KHETEEBAADI - Phase 2 Entity-Relationship Diagram
+    %% Complete Database Schema for AgTech Marketplace
+    %% ═══════════════════════════════════════════════════
+
+    %% ── IDENTITY & RBAC CLUSTER ──
+
+    users {
+        UUID id PK
+        VARCHAR_15 phone UK
+        VARCHAR_255 name
+        VARCHAR_5 language_pref
+        UUID village_id FK
+        VARCHAR_512 avatar_url
+        BOOLEAN is_active
+        BOOLEAN is_verified
+        JSONB metadata
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    roles {
+        UUID id PK
+        VARCHAR_50 slug UK
+        VARCHAR_100 name
+        TEXT description
+        BOOLEAN is_system
+        TIMESTAMPTZ created_at
+    }
+
+    permissions {
+        UUID id PK
+        VARCHAR_100 slug UK
+        VARCHAR_200 name
+        VARCHAR_50 module
+        TEXT description
+    }
+
+    role_permissions {
+        UUID id PK
+        UUID role_id FK
+        UUID permission_id FK
+    }
+
+    user_roles {
+        UUID id PK
+        UUID user_id FK
+        UUID role_id FK
+        TIMESTAMPTZ assigned_at
+        UUID assigned_by FK
+    }
+
+    villages {
+        UUID id PK
+        VARCHAR_255 name
+        VARCHAR_255 name_local
+        VARCHAR_255 district
+        VARCHAR_255 state
+        VARCHAR_10 pin_code
+        FLOAT latitude
+        FLOAT longitude
+        UUID region_id FK
+        BOOLEAN is_active
+        TIMESTAMPTZ created_at
+    }
+
+    regions {
+        UUID id PK
+        VARCHAR_255 name
+        VARCHAR_255 name_local
+        VARCHAR_255 state
+        GEOMETRY boundary
+        BOOLEAN is_active
+    }
+
+    %% ── OVOL PARTNER CLUSTER ──
+
+    ovol_partners {
+        UUID id PK
+        UUID user_id FK
+        UUID region_id FK
+        VARCHAR_50 partner_code UK
+        VARCHAR_20 status
+        DATE onboarded_at
+        INTEGER farmer_capacity
+        NUMERIC_10_2 commission_rate
+        JSONB bank_details
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    ovol_farmer_assignments {
+        UUID id PK
+        UUID ovol_partner_id FK
+        UUID farmer_user_id FK
+        VARCHAR_20 status
+        DATE assigned_at
+        DATE released_at
+        TEXT notes
+    }
+
+    ovol_activity_logs {
+        UUID id PK
+        UUID ovol_partner_id FK
+        VARCHAR_50 action
+        UUID target_user_id FK
+        JSONB details
+        TIMESTAMPTZ performed_at
+    }
+
+    %% ── FARMER PROFILES ──
+
+    farmer_profiles {
+        UUID id PK
+        UUID user_id FK
+        NUMERIC_10_2 total_land_acres
+        VARCHAR_50 land_ownership_type
+        JSONB crops_grown
+        VARCHAR_100 irrigation_type
+        BOOLEAN has_tractor
+        VARCHAR_20 kcc_status
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    %% ── MARKETPLACE CATALOG (Crops) ──
+
+    crop_categories {
+        UUID id PK
+        VARCHAR_255 name
+        VARCHAR_255 name_local
+        VARCHAR_255 slug UK
+        UUID parent_id FK
+        INTEGER sort_order
+        BOOLEAN is_active
+    }
+
+    crop_listings {
+        UUID id PK
+        UUID farmer_id FK
+        UUID category_id FK
+        VARCHAR_255 crop_name
+        VARCHAR_255 crop_name_local
+        VARCHAR_20 crop_variety
+        NUMERIC_10_2 quantity_available
+        VARCHAR_20 quantity_unit
+        NUMERIC_10_2 asking_price_per_unit
+        VARCHAR_10 currency
+        VARCHAR_20 quality_grade
+        DATE expected_harvest_date
+        DATE listing_expiry_date
+        VARCHAR_20 status
+        UUID village_id FK
+        TEXT description
+        JSONB dynamic_attributes
+        BOOLEAN is_organic
+        FLOAT latitude
+        FLOAT longitude
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    crop_listing_images {
+        UUID id PK
+        UUID crop_listing_id FK
+        VARCHAR_512 image_url
+        INTEGER sort_order
+        BOOLEAN is_primary
+        TIMESTAMPTZ uploaded_at
+    }
+
+    crop_quality_inspections {
+        UUID id PK
+        UUID crop_listing_id FK
+        UUID inspector_id FK
+        VARCHAR_20 grade_assigned
+        NUMERIC_5_2 moisture_pct
+        NUMERIC_5_2 foreign_matter_pct
+        JSONB lab_results
+        TEXT remarks
+        TIMESTAMPTZ inspected_at
+    }
+
+    %% ── AGROCHEMICAL STORE (Inputs) ──
+
+    agro_categories {
+        UUID id PK
+        VARCHAR_255 name
+        VARCHAR_255 name_local
+        VARCHAR_255 slug UK
+        UUID parent_id FK
+        VARCHAR_50 category_type
+        INTEGER sort_order
+        BOOLEAN is_active
+    }
+
+    suppliers {
+        UUID id PK
+        VARCHAR_255 company_name
+        VARCHAR_255 brand_name
+        VARCHAR_100 contact_email
+        VARCHAR_15 contact_phone
+        TEXT address
+        VARCHAR_50 gst_number
+        VARCHAR_20 status
+        TIMESTAMPTZ created_at
+    }
+
+    agro_products {
+        UUID id PK
+        UUID category_id FK
+        UUID supplier_id FK
+        VARCHAR_50 sku UK
+        VARCHAR_255 product_name
+        VARCHAR_255 product_name_local
+        TEXT description
+        NUMERIC_10_2 mrp
+        NUMERIC_10_2 selling_price
+        VARCHAR_20 unit_of_measure
+        NUMERIC_10_3 weight_kg
+        VARCHAR_512 image_url
+        JSONB specifications
+        BOOLEAN is_active
+        VARCHAR_50 hsn_code
+        NUMERIC_5_2 gst_rate
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    inventory {
+        UUID id PK
+        UUID product_id FK
+        UUID warehouse_id FK
+        INTEGER quantity_on_hand
+        INTEGER quantity_reserved
+        INTEGER reorder_level
+        INTEGER reorder_quantity
+        DATE last_restock_date
+        TIMESTAMPTZ updated_at
+    }
+
+    warehouses {
+        UUID id PK
+        VARCHAR_255 name
+        UUID region_id FK
+        TEXT address
+        FLOAT latitude
+        FLOAT longitude
+        BOOLEAN is_active
+    }
+
+    %% ── UNIFIED ORDER SYSTEM ──
+
+    orders {
+        UUID id PK
+        VARCHAR_20 order_number UK
+        UUID buyer_id FK
+        UUID seller_id FK
+        VARCHAR_20 order_type
+        VARCHAR_20 status
+        NUMERIC_12_2 subtotal
+        NUMERIC_10_2 delivery_fee
+        NUMERIC_10_2 tax_amount
+        NUMERIC_12_2 total_amount
+        VARCHAR_10 currency
+        TEXT delivery_address
+        UUID delivery_village_id FK
+        TEXT notes
+        VARCHAR_36 idempotency_key UK
+        TIMESTAMPTZ placed_at
+        TIMESTAMPTZ confirmed_at
+        TIMESTAMPTZ shipped_at
+        TIMESTAMPTZ delivered_at
+        TIMESTAMPTZ cancelled_at
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    order_items {
+        UUID id PK
+        UUID order_id FK
+        VARCHAR_20 item_type
+        UUID crop_listing_id FK
+        UUID agro_product_id FK
+        VARCHAR_255 item_name
+        NUMERIC_10_2 quantity
+        VARCHAR_20 unit
+        NUMERIC_10_2 price_per_unit
+        NUMERIC_12_2 subtotal
+        NUMERIC_5_2 tax_rate
+        NUMERIC_10_2 tax_amount
+    }
+
+    order_status_history {
+        UUID id PK
+        UUID order_id FK
+        VARCHAR_20 from_status
+        VARCHAR_20 to_status
+        UUID changed_by FK
+        TEXT reason
+        TIMESTAMPTZ changed_at
+    }
+
+    %% ── PAYMENTS ──
+
+    payments {
+        UUID id PK
+        UUID order_id FK
+        VARCHAR_50 payment_gateway
+        VARCHAR_100 gateway_txn_id
+        NUMERIC_12_2 amount
+        VARCHAR_10 currency
+        VARCHAR_20 status
+        VARCHAR_20 method
+        JSONB gateway_response
+        TIMESTAMPTZ initiated_at
+        TIMESTAMPTZ completed_at
+    }
+
+    %% ── LOCALIZATION (i18n) ──
+
+    locales {
+        UUID id PK
+        VARCHAR_10 code UK
+        VARCHAR_100 name
+        VARCHAR_100 native_name
+        VARCHAR_5 direction
+        BOOLEAN is_active
+        INTEGER sort_order
+    }
+
+    translation_namespaces {
+        UUID id PK
+        VARCHAR_100 namespace UK
+        TEXT description
+    }
+
+    translation_keys {
+        UUID id PK
+        UUID namespace_id FK
+        VARCHAR_255 key UK
+        TEXT default_text
+        VARCHAR_50 context_hint
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    translations {
+        UUID id PK
+        UUID key_id FK
+        UUID locale_id FK
+        TEXT translated_text
+        BOOLEAN is_verified
+        UUID verified_by FK
+        TIMESTAMPTZ updated_at
+    }
+
+    translation_versions {
+        UUID id PK
+        UUID translation_id FK
+        TEXT previous_text
+        TEXT new_text
+        UUID changed_by FK
+        TIMESTAMPTZ changed_at
+    }
+
+    %% ── NOTIFICATIONS ──
+
+    notifications {
+        UUID id PK
+        UUID user_id FK
+        VARCHAR_50 channel
+        VARCHAR_255 title
+        TEXT body
+        JSONB data
+        BOOLEAN is_read
+        TIMESTAMPTZ sent_at
+        TIMESTAMPTZ read_at
+    }
+
+    %% ═══════════════════════════════════════════
+    %% RELATIONSHIPS
+    %% ═══════════════════════════════════════════
+
+    users ||--o{ user_roles : "has"
+    roles ||--o{ user_roles : "assigned_to"
+    roles ||--o{ role_permissions : "grants"
+    permissions ||--o{ role_permissions : "granted_by"
+
+    users ||--o| farmer_profiles : "has_profile"
+    users }o--|| villages : "resides_in"
+    villages }o--|| regions : "belongs_to"
+
+    users ||--o| ovol_partners : "is_ovol"
+    ovol_partners }o--|| regions : "manages"
+    ovol_partners ||--o{ ovol_farmer_assignments : "oversees"
+    users ||--o{ ovol_farmer_assignments : "assigned_to_ovol"
+    ovol_partners ||--o{ ovol_activity_logs : "logged"
+
+    crop_categories ||--o{ crop_categories : "has_subcategory"
+    users ||--o{ crop_listings : "lists"
+    crop_categories ||--o{ crop_listings : "categorized"
+    villages ||--o{ crop_listings : "sourced_from"
+    crop_listings ||--o{ crop_listing_images : "has_images"
+    crop_listings ||--o{ crop_quality_inspections : "inspected"
+
+    agro_categories ||--o{ agro_categories : "has_subcategory"
+    suppliers ||--o{ agro_products : "supplies"
+    agro_categories ||--o{ agro_products : "categorized"
+    agro_products ||--o{ inventory : "stocked"
+    warehouses ||--o{ inventory : "stores"
+    warehouses }o--|| regions : "located_in"
+
+    users ||--o{ orders : "buyer_places"
+    users ||--o{ orders : "seller_fulfills"
+    orders ||--o{ order_items : "contains"
+    crop_listings ||--o{ order_items : "sold_as"
+    agro_products ||--o{ order_items : "sold_as"
+    orders ||--o{ order_status_history : "tracked"
+    orders ||--o{ payments : "paid_via"
+
+    locales ||--o{ translations : "translated_in"
+    translation_namespaces ||--o{ translation_keys : "groups"
+    translation_keys ||--o{ translations : "has_translations"
+    translations ||--o{ translation_versions : "versioned"
+
+    users ||--o{ notifications : "receives"

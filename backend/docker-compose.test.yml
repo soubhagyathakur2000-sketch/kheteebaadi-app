@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  postgres_test:
+    image: postgres:15-alpine
+    container_name: kheteebaadi_postgres_test
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: kheteebaadi_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d kheteebaadi_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test_network
+
+  redis_test:
+    image: redis:7-alpine
+    container_name: kheteebaadi_redis_test
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test_network
+
+volumes:
+  postgres_test_data:
+  redis_test_data:
+
+networks:
+  test_network:
+    driver: bridge

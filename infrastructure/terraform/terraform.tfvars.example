@@ -1,0 +1,54 @@
+# Kheteebaadi Terraform Variables Example
+# Copy this file to terraform.tfvars and fill in the values
+
+# Environment (dev, staging, prod)
+environment = "prod"
+
+# Project name for resource naming
+project_name = "kheteebaadi"
+
+# AWS Region
+aws_region = "ap-south-1"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+
+# RDS Configuration
+db_instance_class      = "db.t4g.micro"
+db_allocated_storage   = 20
+db_name                = "kheteebaadi"
+db_username            = "kheteebaadi_admin"
+db_password            = "CHANGE_ME_TO_STRONG_PASSWORD"  # Use AWS Secrets Manager in production!
+enable_rds_multi_az    = false
+rds_backup_retention   = 7
+rds_backup_window      = "02:00-03:00"
+
+# Redis Configuration
+redis_node_type = "cache.t4g.micro"
+
+# ECS Configuration
+ecs_api_cpu      = 256
+ecs_api_memory   = 512
+ecs_api_min_tasks = 2
+ecs_api_max_tasks = 10
+ecs_cpu_target   = 65
+
+# Domain Configuration
+domain_name = "kheteebaadi.in"
+
+# ACM Certificate ARN (pre-created in AWS)
+# Leave empty to use self-signed certificate (dev/staging only)
+acm_certificate_arn = "arn:aws:acm:ap-south-1:ACCOUNT_ID:certificate/CERTIFICATE_ID"
+
+# Container Insights
+enable_container_insights = true
+
+# Logging
+log_retention_days = 30
+
+# Additional Tags
+tags = {
+  Owner       = "DevOps Team"
+  CostCenter  = "Engineering"
+  BackupPolicy = "Daily"
+}

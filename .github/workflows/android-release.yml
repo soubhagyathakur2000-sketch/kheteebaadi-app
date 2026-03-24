@@ -1,0 +1,351 @@
+name: Android Build & Play Store Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_track:
+        description: 'Release track (internal, alpha, beta, production)'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  FLUTTER_VERSION: '3.x'
+  JAVA_VERSION: '17'
+  GRADLE_CACHE_VERSION: v1
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build-android:
+    name: Build Android App Bundle
+    runs-on: ubuntu-latest
+    outputs:
+      bundle-path: ${{ steps.build.outputs.bundle-path }}
+      version-name: ${{ steps.version.outputs.version-name }}
+      version-code: ${{ steps.version.outputs.version-code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
+
+      - name: Extract version from pubspec.yaml
+        id: version
+        working-directory: flutter_app
+        run: |
+          VERSION=$(grep "^version:" pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
+          BUILD=$(grep "^version:" pubspec.yaml | awk -F'+' '{print $2}')
+          echo "version-name=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version-code=${BUILD}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}, Build: ${BUILD}"
+
+      - name: Cache Flutter pub packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pub-cache
+            flutter_app/.dart_tool
+          key: ${{ runner.os }}-flutter-${{ hashFiles('flutter_app/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
+      - name: Get Flutter dependencies
+        working-directory: flutter_app
+        run: flutter pub get
+
+      - name: Decode keystore from secret
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
+          echo "keystore-path=$(pwd)/keystore.jks" >> $GITHUB_OUTPUT
+
+      - name: Create keystore.properties
+        working-directory: flutter_app/android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cat > keystore.properties << EOF
+          storeFile=../keystore.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Build Flutter App Bundle
+        id: build
+        working-directory: flutter_app
+        env:
+          API_URL: ${{ secrets.PROD_API_URL }}
+          RAZORPAY_KEY: ${{ secrets.RAZORPAY_KEY }}
+          MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
+        run: |
+          flutter build appbundle \
+            --release \
+            --dart-define=API_URL=$API_URL \
+            --dart-define=RAZORPAY_KEY=$RAZORPAY_KEY \
+            --dart-define=MAPBOX_TOKEN=$MAPBOX_TOKEN
+          echo "bundle-path=$(pwd)/build/app/outputs/bundle/release/app-release.aab" >> $GITHUB_OUTPUT
+
+      - name: Upload bundle as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-bundle
+          path: ${{ steps.build.outputs.bundle-path }}
+          retention-days: 5
+
+  apk-size-check:
+    name: APK Size Verification
+    runs-on: ubuntu-latest
+    needs: build-android
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Download bundletool
+        run: |
+          mkdir -p tools
+          gsutil cp gs://android-appengineering/bundletool/latest/bundletool.jar tools/bundletool.jar
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-bundle
+
+      - name: Extract universal APK from bundle
+        run: |
+          java -jar tools/bundletool.jar build-apks \
+            --bundle=app-release.aab \
+            --output=app-universal.apks \
+            --mode=universal \
+            --ks=${{ secrets.ANDROID_KEYSTORE_BASE64 }} \
+            --ks-pass=pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
+            --ks-key-alias=${{ secrets.ANDROID_KEY_ALIAS }} \
+            --key-pass=pass:${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Unzip and check APK size
+        run: |
+          unzip -l app-universal.apks | grep -E "\.apk$" | head -1
+          APK_SIZE=$(unzip -l app-universal.apks | grep "universal\.apk" | awk '{print $1}')
+          APK_SIZE_MB=$((APK_SIZE / 1048576))
+
+          echo "APK Size: ${APK_SIZE_MB}MB"
+
+          # Check if size exceeds 15MB limit
+          if [ "$APK_SIZE_MB" -gt 15 ]; then
+            echo "ERROR: APK size exceeds 15MB limit (${APK_SIZE_MB}MB)"
+            exit 1
+          fi
+
+          echo "Size check passed"
+
+  play-store-release:
+    name: Release to Google Play Store
+    runs-on: ubuntu-latest
+    needs: [build-android, apk-size-check]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download app bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: app-bundle
+
+      - name: Determine release track
+        id: track
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/tags/"* ]]; then
+            TRACK="production"
+            echo "Releasing to production (tag push)"
+          else
+            TRACK="${{ github.event.inputs.release_track }}"
+            echo "Releasing to $TRACK (manual dispatch)"
+          fi
+          echo "track=${TRACK}" >> $GITHUB_OUTPUT
+
+      - name: Upload to Google Play Store
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT }}
+          packageName: com.kheteebaadi.app
+          releaseFiles: app-release.aab
+          track: ${{ steps.track.outputs.track }}
+          status: completed
+          inAppUpdatePriority: 3
+          whatsNewDirectory: flutter_app/fastlane/metadata/android/en-US/changelogs/
+
+      - name: Wait for Play Store processing
+        run: |
+          echo "Play Store upload initiated"
+          echo "Waiting 60 seconds for Play Store to process..."
+          sleep 60
+
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-android, play-store-release]
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download app bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: app-bundle
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          # Extract changelog from CHANGELOG.md if it exists
+          if [ -f "flutter_app/CHANGELOG.md" ]; then
+            NOTES=$(awk '/^## \[${{ steps.version.outputs.version }}\]/,/^## \[/' flutter_app/CHANGELOG.md | head -n -1)
+          else
+            NOTES="Release ${{ steps.version.outputs.version }}"
+          fi
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Release ${{ steps.version.outputs.version }}
+          body: |
+            ## Android Release
+
+            **Version:** ${{ steps.version.outputs.version }}
+            **Build:** ${{ needs.build-android.outputs.version-code }}
+
+            ### Release Notes
+            ${{ steps.release-notes.outputs.notes }}
+
+            ### Distribution
+            - **Play Store Track:** ${{ github.event.inputs.release_track || 'production' }}
+            - **Status:** Released to Google Play Store
+
+            ### Details
+            - **Flutter:** ${{ env.FLUTTER_VERSION }}
+            - **Java:** ${{ env.JAVA_VERSION }}
+            - **Built by:** ${{ github.actor }}
+            - **Commit:** ${{ github.sha }}
+
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'alpha') }}
+
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: app-release.aab
+          asset_name: app-release-${{ steps.version.outputs.version }}.aab
+          asset_content_type: application/octet-stream
+
+  notify-release:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [build-android, github-release]
+    if: always()
+    steps:
+      - name: Determine track
+        id: track
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/tags/"* ]]; then
+            echo "track=production" >> $GITHUB_OUTPUT
+          else
+            echo "track=${{ github.event.inputs.release_track }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Slack notification
+        if: always()
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_RELEASES }}
+        run: |
+          STATUS="✅ Success"
+          if [ "${{ job.status }}" != "success" ]; then
+            STATUS="❌ Failed"
+          fi
+
+          curl -X POST "$SLACK_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "text": "Android Release Status",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🚀 Android Build & Release"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\n'"$STATUS"'"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Version:*\n${{ needs.build-android.outputs.version-name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Track:*\n${{ steps.track.outputs.track }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Actor:*\n${{ github.actor }}"
+                    }
+                  ]
+                }
+              ]
+            }'

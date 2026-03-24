@@ -1,0 +1,28 @@
+{
+  "proxies": [
+    {
+      "name": "postgres",
+      "listen": "0.0.0.0:5433",
+      "upstream": "postgres:5432",
+      "enabled": true
+    },
+    {
+      "name": "redis",
+      "listen": "0.0.0.0:6380",
+      "upstream": "redis:6379",
+      "enabled": true
+    },
+    {
+      "name": "s3",
+      "listen": "0.0.0.0:9000",
+      "upstream": "s3.amazonaws.com:443",
+      "enabled": true
+    },
+    {
+      "name": "razorpay",
+      "listen": "0.0.0.0:9001",
+      "upstream": "api.razorpay.com:443",
+      "enabled": true
+    }
+  ]
+}

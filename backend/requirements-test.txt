@@ -1,0 +1,28 @@
+# Testing dependencies for Kheteebaadi backend
+
+# Core testing framework
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-xdist==3.5.0
+pytest-html==4.1.1
+
+# HTTP testing
+httpx==0.25.2
+aiosqlite==3.14.0
+
+# Mocking and fixtures
+fakeredis==2.20.0
+
+# For schema validation in tests
+phonenumbers==8.13.0
+
+# Code coverage
+coverage==7.3.2
+
+# Type checking (optional but recommended)
+mypy==1.7.1
+types-phonenumbers==8.13.0.4
+
+# Load testing
+k6==0.4.1

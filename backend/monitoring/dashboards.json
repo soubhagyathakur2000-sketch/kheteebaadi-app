@@ -1,0 +1,532 @@
+{
+  "dashboards": [
+    {
+      "name": "kheteebaadi-operations",
+      "body": {
+        "widgets": [
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/ApplicationELB", "TargetResponseTime", {"stat": "p99"}],
+                [".", ".", {"stat": "p95"}],
+                [".", ".", {"stat": "p50"}],
+                [".", ".", {"stat": "Average"}]
+              ],
+              "period": 60,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "API Response Time (p50, p95, p99)",
+              "yAxis": {
+                "left": {
+                  "label": "Seconds",
+                  "showUnits": false
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/ApplicationELB", "5XXError"],
+                [".", "4XXError"],
+                [".", "2XXError"]
+              ],
+              "period": 60,
+              "stat": "Sum",
+              "region": "us-east-1",
+              "title": "API Response Status Codes",
+              "yAxis": {
+                "left": {
+                  "label": "Count"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/ApplicationELB", "RequestCount"],
+                [".", "TargetConnectionCount"]
+              ],
+              "period": 60,
+              "stat": "Sum",
+              "region": "us-east-1",
+              "title": "API Request Volume",
+              "yAxis": {
+                "left": {
+                  "label": "Count per minute"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/ECS", "DesiredTaskCount", {"dimensions": {"ClusterName": "kheteebaadi-prod"}}],
+                [".", "RunningCount", {"dimensions": {"ClusterName": "kheteebaadi-prod"}}],
+                [".", "PendingCount", {"dimensions": {"ClusterName": "kheteebaadi-prod"}}]
+              ],
+              "period": 300,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "ECS Task Status",
+              "yAxis": {
+                "left": {
+                  "label": "Tasks"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/ECS", "CPUUtilization", {"dimensions": {"ClusterName": "kheteebaadi-prod"}}],
+                [".", "MemoryUtilization", {"dimensions": {"ClusterName": "kheteebaadi-prod"}}]
+              ],
+              "period": 300,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "ECS Cluster Resource Utilization",
+              "yAxis": {
+                "left": {
+                  "label": "Percentage",
+                  "min": 0,
+                  "max": 100
+                }
+              },
+              "annotations": {
+                "horizontal": [
+                  {
+                    "label": "Critical Threshold",
+                    "value": 85
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/RDS", "DatabaseConnections", {"dimensions": {"DBInstanceIdentifier": "kheteebaadi-prod"}}],
+                [".", "CPUUtilization", {"dimensions": {"DBInstanceIdentifier": "kheteebaadi-prod"}}]
+              ],
+              "period": 300,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "RDS Connection Pool & CPU",
+              "yAxis": {
+                "left": {
+                  "label": "Connections / CPU %",
+                  "min": 0
+                }
+              },
+              "annotations": {
+                "horizontal": [
+                  {
+                    "label": "Connection Warning",
+                    "value": 200
+                  },
+                  {
+                    "label": "CPU Critical",
+                    "value": 85
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/RDS", "ReadLatency", {"dimensions": {"DBInstanceIdentifier": "kheteebaadi-prod"}}],
+                [".", "WriteLatency", {"dimensions": {"DBInstanceIdentifier": "kheteebaadi-prod"}}]
+              ],
+              "period": 300,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "RDS I/O Latency",
+              "yAxis": {
+                "left": {
+                  "label": "Milliseconds"
+                }
+              }
+            }
+          },
+          {
+            "type": "log",
+            "properties": {
+              "query": "fields @timestamp, @message, @logStream\n| stats count() as log_count by @logStream\n| sort log_count desc",
+              "region": "us-east-1",
+              "title": "Application Logs by Source",
+              "queryId": "operations-logs-by-source"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "kheteebaadi-business",
+      "body": {
+        "widgets": [
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["Kheteebaadi/Business", "ActiveFarmersCount"],
+                [".", "DailyActiveUsers"]
+              ],
+              "period": 3600,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "Active Users Metrics",
+              "yAxis": {
+                "left": {
+                  "label": "Count"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["Kheteebaadi/Business", "SyncVolumeBytes"],
+                [".", "SyncTransactionCount"]
+              ],
+              "period": 300,
+              "stat": "Sum",
+              "region": "us-east-1",
+              "title": "Sync Volume Metrics",
+              "yAxis": {
+                "left": {
+                  "label": "Volume"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["Kheteebaadi/Business", "PaymentTransactionCount"],
+                [".", "PaymentSuccessRate"]
+              ],
+              "period": 300,
+              "stat": "Sum",
+              "region": "us-east-1",
+              "title": "Payment Success Rate (%)",
+              "yAxis": {
+                "left": {
+                  "label": "Percentage",
+                  "min": 0,
+                  "max": 100
+                }
+              },
+              "annotations": {
+                "horizontal": [
+                  {
+                    "label": "Target SLA",
+                    "value": 99.5,
+                    "color": "#2ca02c"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["Kheteebaadi/Business", "MandiListingCount"],
+                [".", "ActiveCropListingsCount"],
+                [".", "ActiveBuyersCount"]
+              ],
+              "period": 3600,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "Marketplace Activity",
+              "yAxis": {
+                "left": {
+                  "label": "Count"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["Kheteebaadi/Business", "StuckPaymentsCount"],
+                [".", "FailedSyncCount"],
+                [".", "StaleSyncClientsCount"]
+              ],
+              "period": 300,
+              "stat": "Sum",
+              "region": "us-east-1",
+              "title": "Data Integrity Issues",
+              "yAxis": {
+                "left": {
+                  "label": "Count"
+                }
+              },
+              "annotations": {
+                "horizontal": [
+                  {
+                    "label": "Critical Alert",
+                    "value": 5
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["Kheteebaadi/Business", "DailyTransactionVolume"],
+                [".", "DailyRevenue"]
+              ],
+              "period": 3600,
+              "stat": "Sum",
+              "region": "us-east-1",
+              "title": "Daily Business Metrics",
+              "yAxis": {
+                "left": {
+                  "label": "Amount (INR) / Transaction Count"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["Kheteebaadi/Business", "UserRetentionRate"],
+                [".", "MonthlyActiveUsersChange"]
+              ],
+              "period": 86400,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "User Retention & Growth",
+              "yAxis": {
+                "left": {
+                  "label": "Percentage / Count"
+                }
+              }
+            }
+          },
+          {
+            "type": "log",
+            "properties": {
+              "query": "fields @timestamp, payment_status, amount, farmer_id\n| filter payment_status='failed'\n| stats count() as failed_payments by payment_status",
+              "region": "us-east-1",
+              "title": "Failed Payment Breakdown",
+              "queryId": "business-failed-payments"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "kheteebaadi-infrastructure",
+      "body": {
+        "widgets": [
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/ECS", "CPUUtilization", {"stat": "Average"}],
+                [".", "MemoryUtilization", {"stat": "Average"}],
+                [".", "NetworkIn", {"stat": "Sum"}],
+                [".", "NetworkOut", {"stat": "Sum"}]
+              ],
+              "period": 300,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "ECS Container Resource Usage",
+              "yAxis": {
+                "left": {
+                  "label": "CPU/Memory %"
+                },
+                "right": {
+                  "label": "Network Bytes"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/RDS", "CPUUtilization"],
+                [".", "DatabaseConnections"],
+                [".", "FreeableMemory"],
+                [".", "FreeStorageSpace"]
+              ],
+              "period": 300,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "RDS Instance Health",
+              "yAxis": {
+                "left": {
+                  "label": "Percentage / Count"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/ElastiCache", "CPUUtilization"],
+                [".", "DatabaseMemoryUsagePercentage"],
+                [".", "Evictions"],
+                [".", "EngineCPUUtilization"]
+              ],
+              "period": 300,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "Redis Cache Performance",
+              "yAxis": {
+                "left": {
+                  "label": "Percentage / Count"
+                }
+              },
+              "annotations": {
+                "horizontal": [
+                  {
+                    "label": "Memory Warning",
+                    "value": 80
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/CloudFront", "BytesDownloaded"],
+                [".", "BytesUploaded"],
+                [".", "Requests"],
+                [".", "4xxErrorRate"],
+                [".", "5xxErrorRate"]
+              ],
+              "period": 300,
+              "stat": "Sum",
+              "region": "us-east-1",
+              "title": "CloudFront CDN Performance",
+              "yAxis": {
+                "left": {
+                  "label": "Bytes / Requests"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/ApplicationELB", "ActiveConnectionCount"],
+                [".", "NewConnectionCount"],
+                [".", "RejectedConnectionCount"],
+                [".", "ProcessedBytes"]
+              ],
+              "period": 300,
+              "stat": "Sum",
+              "region": "us-east-1",
+              "title": "Load Balancer Connection Metrics",
+              "yAxis": {
+                "left": {
+                  "label": "Count / Bytes"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/EC2", "CPUUtilization", {"stat": "Average"}],
+                [".", "NetworkIn", {"stat": "Sum"}],
+                [".", "NetworkOut", {"stat": "Sum"}],
+                [".", "DiskReadBytes", {"stat": "Sum"}],
+                [".", "DiskWriteBytes", {"stat": "Sum"}]
+              ],
+              "period": 300,
+              "stat": "Average",
+              "region": "us-east-1",
+              "title": "EC2 Instance Performance",
+              "yAxis": {
+                "left": {
+                  "label": "CPU % / I/O Bytes"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/Lambda", "Invocations"],
+                [".", "Errors"],
+                [".", "Duration"],
+                [".", "Throttles"]
+              ],
+              "period": 300,
+              "stat": "Sum",
+              "region": "us-east-1",
+              "title": "Lambda Function Health",
+              "yAxis": {
+                "left": {
+                  "label": "Count / Milliseconds"
+                }
+              }
+            }
+          },
+          {
+            "type": "metric",
+            "properties": {
+              "metrics": [
+                ["AWS/Logs", "IncomingBytes"],
+                [".", "IncomingLogEvents"]
+              ],
+              "period": 300,
+              "stat": "Sum",
+              "region": "us-east-1",
+              "title": "CloudWatch Logs Ingestion",
+              "yAxis": {
+                "left": {
+                  "label": "Bytes / Events"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "dashboard_metadata": {
+    "operations": {
+      "description": "Real-time operations dashboard for API performance and system health",
+      "refresh_interval": 60,
+      "favorite": true
+    },
+    "business": {
+      "description": "Business metrics dashboard for user engagement and revenue",
+      "refresh_interval": 300,
+      "favorite": true
+    },
+    "infrastructure": {
+      "description": "Infrastructure dashboard for resource utilization and cloud services",
+      "refresh_interval": 300,
+      "favorite": false
+    }
+  }
+}

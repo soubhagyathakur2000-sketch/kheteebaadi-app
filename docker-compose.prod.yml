@@ -1,0 +1,224 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Kheteebaadi - Production Docker Compose Configuration
+#
+# Usage: docker compose -f docker-compose.prod.yml up -d
+#
+# This compose file provides a production-like setup with:
+# - PostgreSQL 15 (Alpine for minimal size)
+# - Redis 7 (Alpine for minimal size)
+# - FastAPI backend with health checks
+# - Celery workers for background tasks
+# - Celery Beat for scheduled tasks
+# - Proper networking and volumes
+# ═══════════════════════════════════════════════════════════════════════════
+
+version: "3.9"
+
+# Shared environment variables across services
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+  JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+  ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+  DEBUG: ${DEBUG:-false}
+  CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000"]}
+  AWS_REGION: ${AWS_REGION:-ap-south-1}
+  S3_BUCKET: ${S3_BUCKET:-kheteebaadi}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+
+services:
+  # ══════════════════════════════════════════════════════════════════════════
+  # PostgreSQL Database
+  # ══════════════════════════════════════════════════════════════════════════
+  db:
+    image: postgres:15-alpine
+    container_name: kheteebaadi-postgres-prod
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      # Initialize as UTF-8 for proper text support
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      # Named volume for persistent database storage
+      - postgres_data:/var/lib/postgresql/data
+      # Optional: Mount initialization scripts if needed
+      # - ./infrastructure/scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      # pg_isready is the standard PostgreSQL health check tool
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - kheteebaadi-net
+    # Production: Restrict database network access
+    # Only accessible from services on the same network
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Redis Cache and Message Broker
+  # ══════════════════════════════════════════════════════════════════════════
+  redis:
+    image: redis:7-alpine
+    container_name: kheteebaadi-redis-prod
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      # Named volume for Redis persistence (AOF)
+      - redis_data:/data
+    command: >
+      redis-server
+      --maxmemory ${REDIS_MAX_MEMORY:-256mb}
+      --maxmemory-policy ${REDIS_EVICTION_POLICY:-allkeys-lru}
+      --appendonly yes
+      --appendfsync everysec
+      --requirepass ${REDIS_PASSWORD:-}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - kheteebaadi-net
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # FastAPI Backend API
+  # ══════════════════════════════════════════════════════════════════════════
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      # Build args can be used for build-time configuration
+      # args:
+      #   BUILD_ENV: production
+    container_name: kheteebaadi-api-prod
+    environment:
+      <<: *backend-env
+      # Service-specific configuration
+      APP_NAME: ${APP_NAME:-Kheteebaadi API}
+      VERSION: ${APP_VERSION:-1.0.0}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Entrypoint script handles DB migrations and startup tasks
+    entrypoint: ["/app/scripts/entrypoint.sh"]
+    restart: unless-stopped
+    networks:
+      - kheteebaadi-net
+    # Resource limits for production stability
+    # Adjust based on your deployment environment
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1'
+    #       memory: 512M
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 256M
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Celery Worker - Background Task Processing
+  # ══════════════════════════════════════════════════════════════════════════
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: kheteebaadi-celery-worker-prod
+    environment:
+      <<: *backend-env
+      # Celery-specific configuration
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - kheteebaadi-net
+    # Logs from Celery worker
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Resource limits for production stability
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1'
+    #       memory: 512M
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 256M
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Celery Beat - Scheduled Task Scheduler
+  # ══════════════════════════════════════════════════════════════════════════
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: kheteebaadi-celery-beat-prod
+    environment:
+      <<: *backend-env
+      # Celery-specific configuration
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    # Override the worker CMD to run beat scheduler instead
+    command: >
+      celery -A app.workers.celery_app beat
+      --loglevel=info
+      --schedule=/tmp/celerybeat-schedule
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - kheteebaadi-net
+    # Logs from Celery Beat
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Named Volumes
+# Provides persistent storage for database and cache across container restarts
+# ═══════════════════════════════════════════════════════════════════════════
+volumes:
+  postgres_data:
+    driver: local
+    # Optional: Configure volume driver options
+    # driver_opts:
+    #   type: tmpfs
+    #   device: tmpfs
+
+  redis_data:
+    driver: local
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Networks
+# Custom network for service-to-service communication
+# Enables DNS-based service discovery (e.g., redis:6379)
+# ═══════════════════════════════════════════════════════════════════════════
+networks:
+  kheteebaadi-net:
+    driver: bridge

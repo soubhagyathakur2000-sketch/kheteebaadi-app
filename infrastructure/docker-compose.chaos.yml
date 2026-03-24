@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.5.0
+    container_name: toxiproxy
+    ports:
+      - "8474:8474"
+      - "5433:5433"
+      - "6380:6380"
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./infrastructure/toxiproxy/toxiproxy.json:/config/toxiproxy.json
+    command: ["-config", "/config/toxiproxy.json"]
+    networks:
+      - kheteebaadi-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8474/api/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_DB: kheteebaadi
+      POSTGRES_USER: kheteebaadi_user
+      POSTGRES_PASSWORD: secure_password_123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kheteebaadi-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kheteebaadi_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - kheteebaadi-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kheteebaadi-backend
+    environment:
+      DATABASE_URL: postgresql://kheteebaadi_user:secure_password_123@toxiproxy:5433/kheteebaadi
+      REDIS_URL: redis://toxiproxy:6380/0
+      S3_ENDPOINT: http://toxiproxy:9000
+      RAZORPAY_ENDPOINT: https://toxiproxy:9001
+      FLASK_ENV: development
+    ports:
+      - "5000:5000"
+    depends_on:
+      toxiproxy:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kheteebaadi-network
+    volumes:
+      - ./backend:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ovol-dashboard:
+    build:
+      context: ./ovol-dashboard
+      dockerfile: Dockerfile
+    container_name: ovol-dashboard
+    environment:
+      REACT_APP_API_BASE_URL: http://localhost:5000
+      REACT_APP_MAPBOX_TOKEN: ${MAPBOX_TOKEN:-pk.test}
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - kheteebaadi-network
+    volumes:
+      - ./ovol-dashboard:/app
+      - /app/node_modules
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  flutter-app:
+    build:
+      context: ./flutter_app
+      dockerfile: Dockerfile
+    container_name: flutter-app
+    environment:
+      API_BASE_URL: http://backend:5000
+    ports:
+      - "8080:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - kheteebaadi-network
+    volumes:
+      - ./flutter_app:/app
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  kheteebaadi-network:
+    driver: bridge
