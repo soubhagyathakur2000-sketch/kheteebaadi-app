@@ -27,7 +27,7 @@ class AppConfig {
         return 'https://staging-api.kheteebaadi.com';
       case 'production':
       default:
-        return 'https://api.kheteebaadi.com';
+        return 'https://kheteebaadi-app-production.up.railway.app';
     }
   }
 
