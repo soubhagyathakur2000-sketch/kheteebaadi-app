@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from typing import Optional
 
 
@@ -10,6 +11,14 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost/kheteebaadi"
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def fix_database_url(cls, v: str) -> str:
+        """Convert postgresql:// to postgresql+asyncpg:// for async support."""
+        if v.startswith("postgresql://"):
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
