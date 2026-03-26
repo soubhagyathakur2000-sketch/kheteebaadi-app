@@ -69,18 +69,14 @@ RUN chown -R appuser:appuser /app
 # Switch to non-root user for container execution
 USER appuser
 
-# Expose application port
-EXPOSE 8000
+# Expose application port (Railway assigns PORT dynamically)
+EXPOSE ${PORT:-8000}
 
 # Health check - validates that the API is responding correctly
-# Interval: check every 30 seconds
-# Timeout: consider unhealthy if response takes >10 seconds
-# Start period: allow 40 seconds for application startup
-# Retries: mark unhealthy after 3 consecutive failures
+# Uses $PORT so it matches whatever Railway assigns
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5.0)" || exit 1
+    CMD python -c "import httpx, os; httpx.get(f'http://localhost:{os.environ.get(\"PORT\", 8000)}/health', timeout=5.0)" || exit 1
 
 # Default command: start FastAPI app with uvicorn
-# Using 2 workers for balanced concurrency and memory usage
-# Bind to 0.0.0.0 to ensure accessibility from all interfaces in container
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Shell form is required so $PORT expands at runtime (Railway sets PORT dynamically)
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1
