@@ -35,15 +35,17 @@ async def lifespan(app: FastAPI):
         # Initialize database
         await init_db()
         logger.info("Database initialized")
+    except Exception as e:
+        logger.error("Database init failed (will retry on first request)", error=str(e))
 
+    try:
         # Initialize Redis
         await redis_client.connect()
         logger.info("Redis connected")
-
-        logger.info("Application startup complete")
     except Exception as e:
-        logger.error("Startup failed", error=str(e))
-        raise
+        logger.error("Redis connection failed", error=str(e))
+
+    logger.info("Application startup complete")
 
     yield
 

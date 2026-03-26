@@ -9,16 +9,13 @@ from typing import AsyncGenerator
 
 from app.core.config import settings
 
-# Create async engine
+# Create async engine - use NullPool for Railway compatibility
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
-    pool_size=20,
-    max_overflow=10,
-    pool_pre_ping=True,
+    poolclass=NullPool,
     connect_args={
-        "server_settings": {"jit": "off"},
-        "timeout": 10,
+        "timeout": 30,
     },
 )
 
